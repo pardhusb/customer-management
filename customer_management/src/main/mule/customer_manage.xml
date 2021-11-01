@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd 
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd">
+    <http:listener-config name="customer_manage-httpListenerConfig">
+        <http:listener-connection host="${http.host}" port="${http.port}" />
+    </http:listener-config>
+    <apikit:config name="customer_manage-config" api="resource::73e3e49d-e42c-4678-98fa-1d08cde70aeb:customer_manage:1.0.0:raml:zip:customer_manage.raml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" />
+    <db:config name="Database_Config" doc:name="Database Config" doc:id="badbb405-f398-4d10-b141-95ee47d41101" >
+		<db:my-sql-connection host="${db.host}" port="${db.port}" user="${secure::db.user}" password="${secure::db.password}" database="${db.database}" />
+	</db:config>
+	<configuration-properties doc:name="Configuration properties" doc:id="32ea0be3-4e19-47e6-b1c8-cba71f7380e5" file="${env}.properties" />
+	<secure-properties:config name="Secure_Properties_Config" doc:name="Secure Properties Config" doc:id="75fcd3a0-2718-4b95-916f-1d9dda271a51" file="${env}.secure.properties" key="${key}" >
+		<secure-properties:encrypt algorithm="Blowfish" />
+	</secure-properties:config>
+	<flow name="customer_manage-main">
+        <http:listener config-ref="customer_manage-httpListenerConfig" path="/api/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:router config-ref="customer_manage-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:BAD_REQUEST">
+                <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Bad request"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">400</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED">
+                <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Method not allowed"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">405</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_ACCEPTABLE">
+                <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not acceptable"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">406</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE">
+                <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Unsupported media type"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">415</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_IMPLEMENTED">
+                <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not Implemented"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">501</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="put:\customer:application\json:customer_manage-config">
+        <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  message: "customer data updated successfully"
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="delete:\customer:customer_manage-config">
+        <set-variable value="#[attributes.queryParams.phone]" doc:name="Set Variable" doc:id="9f0d453d-7223-40cb-87b8-492ccf49503b" variableName="phone"/>
+		<db:select doc:name="Select" doc:id="61be826f-1ae9-42ad-9354-6914c2112c13" config-ref="Database_Config">
+			<db:sql ><![CDATA[SELECT * FROM customer_management WHERE phone = :phone]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	phone : attributes.queryParams.phone
+}]]]></db:input-parameters>
+		</db:select>
+		<choice doc:name="Choice" doc:id="ab4d3ff5-f25d-469b-890b-7ae6feea6b35" >
+			<when expression="#[sizeOf(payload) &gt;0]">
+				<db:delete doc:name="Delete" doc:id="b0793de9-774c-4f57-ab4e-c688959eadfe" config-ref="Database_Config">
+			<db:sql><![CDATA[DELETE FROM customer_management WHERE phone = :phone]]></db:sql>
+			<db:input-parameters><![CDATA[#[{
+	phone : vars.phone
+}]]]></db:input-parameters>
+		</db:delete>
+				<ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  message: "requested customer deleted successfully"
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+			</when>
+			<otherwise >
+				<ee:transform doc:name="Transform Message" doc:id="33a5af84-6405-430a-9c36-7697290d5414" >
+					<ee:message >
+						<ee:set-payload ><![CDATA["For the givem mobile number there is no customer"]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+    </flow>
+    <flow name="patch:\customer:application\json:customer_manage-config">
+        <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  message: "new mobile number updated successfully"
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="get:\customer:customer_manage-config">
+		<db:select doc:name="Select" doc:id="2db1e9b7-5b1b-4deb-a4e6-7b824a8e738b" config-ref="Database_Config">
+			<db:sql ><![CDATA[SELECT * FROM customer_management]]></db:sql>
+		</db:select>
+		<ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="post:\customer:application\json:customer_manage-config">
+		<foreach doc:name="For Each" doc:id="af9c0540-727d-4565-9b50-e3e654ea84d6" >
+			<logger level="INFO" doc:name="Logger" doc:id="91a3f808-bfde-46ff-9f09-62bfaeb3c255" message="#[payload]" />
+			<db:insert doc:name="Insert" doc:id="0414a15a-3c5a-4836-bfe0-a688e2552118" config-ref="Database_Config">
+			<db:sql><![CDATA[INSERT INTO customer_management (name, email, adress, phone)
+VALUES (:name, :email, :adress, :phone)]]></db:sql>
+			<db:input-parameters><![CDATA[#[{
+	name : payload.name,
+	email : payload.email,
+	adress : payload.adress,
+	phone : payload.phone
+}]]]></db:input-parameters>
+		</db:insert>
+			<logger level="INFO" doc:name="Logger" doc:id="44f6e9b7-0c6c-44d8-954a-eb2bc4587444" message="data inserted into database" />
+		</foreach>
+		<ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  "environment" : p('dev-environment'),
+  "application" : p('customer_management'), 
+  message: "customer profile created successfully"
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+</mule>
